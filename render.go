@@ -1,12 +1,11 @@
-// Copyright 2012 tsuru authors. All rights reserved.
+// Copyright 2018 tsuru authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package cmd
+package tablecli
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"reflect"
 	"regexp"
@@ -17,31 +16,17 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const (
-	pattern  = "\033[%d;%d;%dm%s\033[0m"
-	bgFactor = 10
-)
+var TableConfig = struct {
+	BreakOnAny bool
+	ForceWrap  bool
+}{
+	BreakOnAny: false,
+	ForceWrap:  false,
+}
 
 var ignoredPatterns = []*regexp.Regexp{
 	regexp.MustCompile("\033\\[\\d+;\\d+;\\d+m"),
 	regexp.MustCompile("\033\\[0m"),
-}
-
-var fontColors = map[string]int{
-	"black":   30,
-	"red":     31,
-	"green":   32,
-	"yellow":  33,
-	"blue":    34,
-	"magenta": 35,
-	"cyan":    36,
-	"white":   37,
-}
-
-var fontEffects = map[string]int{
-	"reset":   0,
-	"bold":    1,
-	"inverse": 7,
 }
 
 type Table struct {
@@ -100,7 +85,7 @@ func (t *Table) addRows(rows rowSlice, sizes []int, buf *bytes.Buffer) {
 }
 
 func splitJoinEvery(str string, n int) string {
-	breakOnAny := os.Getenv("TSURU_BREAK_ANY") != ""
+	breakOnAny := TableConfig.BreakOnAny
 	breakChars := []rune{' ', '.', ':', '='}
 	n -= 1
 	str = strings.TrimRightFunc(str, unicode.IsSpace)
@@ -225,7 +210,7 @@ func (t *Table) String() string {
 	}
 	var ttyWidth int
 	terminalFd := int(os.Stdout.Fd())
-	if os.Getenv("TSURU_FORCE_WRAP") != "" {
+	if TableConfig.ForceWrap {
 		terminalFd = int(os.Stdin.Fd())
 	}
 	if terminal.IsTerminal(terminalFd) {
@@ -347,11 +332,4 @@ func (l rowSlice) Less(i, j int) bool {
 
 func (l rowSlice) Swap(i, j int) {
 	l[i], l[j] = l[j], l[i]
-}
-
-func Colorfy(msg string, fontcolor string, background string, effect string) string {
-	if os.Getenv("TSURU_DISABLE_COLORS") != "" {
-		return msg
-	}
-	return fmt.Sprintf(pattern, fontEffects[effect], fontColors[fontcolor], fontColors[background]+bgFactor, msg)
 }

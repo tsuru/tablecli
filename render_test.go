@@ -1,25 +1,25 @@
-// Copyright 2012 tsuru authors. All rights reserved.
+// Copyright 2018 tsuru authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package cmd
+package tablecli
 
 import (
 	"bytes"
-	"os"
+	"fmt"
 	"sort"
 	"testing"
 
-	"gopkg.in/check.v1"
+	"github.com/stretchr/testify/assert"
 )
 
-func (s *S) TestAddOneRow(c *check.C) {
+func TestAddOneRow(t *testing.T) {
 	table := NewTable()
 	table.AddRow(Row{"Three", "foo"})
-	c.Assert(table.String(), check.Equals, "+-------+-----+\n| Three | foo |\n+-------+-----+\n")
+	assert.Equal(t, "+-------+-----+\n| Three | foo |\n+-------+-----+\n", table.String())
 }
 
-func (s *S) TestAddRows(c *check.C) {
+func TestAddRows(t *testing.T) {
 	table := NewTable()
 	table.AddRow(Row{"One", "1"})
 	table.AddRow(Row{"Two", "2"})
@@ -30,23 +30,23 @@ func (s *S) TestAddRows(c *check.C) {
 | Three | 3 |
 +-------+---+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestRows(c *check.C) {
+func TestRows(t *testing.T) {
 	table := NewTable()
-	c.Assert(table.Rows(), check.Equals, 0)
+	assert.Equal(t, 0, table.Rows())
 	table.AddRow(Row{"One", "1"})
-	c.Assert(table.Rows(), check.Equals, 1)
+	assert.Equal(t, 1, table.Rows())
 	table.AddRow(Row{"One", "1"})
-	c.Assert(table.Rows(), check.Equals, 2)
+	assert.Equal(t, 2, table.Rows())
 	table.AddRow(Row{"One", "1"})
 	table.AddRow(Row{"One", "1"})
 	table.AddRow(Row{"One", "1"})
-	c.Assert(table.Rows(), check.Equals, 5)
+	assert.Equal(t, 5, table.Rows())
 }
 
-func (s *S) TestSort(c *check.C) {
+func TestSort(t *testing.T) {
 	table := NewTable()
 	table.AddRow(Row{"Three", "3"})
 	table.AddRow(Row{"Zero", "0"})
@@ -60,26 +60,26 @@ func (s *S) TestSort(c *check.C) {
 +-------+---+
 `
 	table.Sort()
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestColumnsSize(c *check.C) {
+func TestColumnsSize(t *testing.T) {
 	table := NewTable()
 	table.AddRow(Row{"One", "1"})
 	table.AddRow(Row{"Two", "2"})
 	table.AddRow(Row{"Three", "3"})
-	c.Assert(table.columnsSize(), check.DeepEquals, []int{5, 1})
+	assert.Equal(t, []int{5, 1}, table.columnsSize())
 }
 
-func (s *S) TestSeparator(c *check.C) {
+func TestSeparator(t *testing.T) {
 	table := NewTable()
 	expected := "+-------+---+\n"
 	buf := bytes.NewBuffer(nil)
 	table.separator(buf, []int{5, 1})
-	c.Assert(buf.String(), check.Equals, expected)
+	assert.Equal(t, expected, buf.String())
 }
 
-func (s *S) TestHeadings(c *check.C) {
+func TestHeadings(t *testing.T) {
 	table := NewTable()
 	table.Headers = Row{"Word", "Number"}
 	table.AddRow(Row{"One", "1"})
@@ -93,10 +93,10 @@ func (s *S) TestHeadings(c *check.C) {
 | Three | 3      |
 +-------+--------+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestString(c *check.C) {
+func TestString(t *testing.T) {
 	table := NewTable()
 	table.AddRow(Row{"One", "1"})
 	table.AddRow(Row{"Two", "2"})
@@ -107,10 +107,10 @@ func (s *S) TestString(c *check.C) {
 | Three | 3 |
 +-------+---+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestStringWithSeparator(c *check.C) {
+func TestStringWithSeparator(t *testing.T) {
 	table := NewTable()
 	table.LineSeparator = true
 	table.AddRow(Row{"One", "1"})
@@ -124,10 +124,10 @@ func (s *S) TestStringWithSeparator(c *check.C) {
 | Three | 3 |
 +-------+---+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestStringWithNewLineMultipleColumns(c *check.C) {
+func TestStringWithNewLineMultipleColumns(t *testing.T) {
 	table := NewTable()
 	table.AddRow(Row{"One", "1", ""})
 	table.AddRow(Row{"Two", "xxx\nyyy", "aa\nbb\ncc\ndd"})
@@ -141,10 +141,10 @@ func (s *S) TestStringWithNewLineMultipleColumns(c *check.C) {
 | Three | 3   |    |
 +-------+-----+----+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestStringWithNewLine(c *check.C) {
+func TestStringWithNewLine(t *testing.T) {
 	table := NewTable()
 	table.AddRow(Row{"One", "xxx\nyyy"})
 	table.AddRow(Row{"Two", "2"})
@@ -156,10 +156,10 @@ func (s *S) TestStringWithNewLine(c *check.C) {
 | Three | 3   |
 +-------+-----+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestStringWithNewLineWithSeparator(c *check.C) {
+func TestStringWithNewLineWithSeparator(t *testing.T) {
 	table := NewTable()
 	table.LineSeparator = true
 	table.AddRow(Row{"One", "xxx\nyyy\nzzzz"})
@@ -175,10 +175,10 @@ func (s *S) TestStringWithNewLineWithSeparator(c *check.C) {
 | Three | 3    |
 +-------+------+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestRenderNoRows(c *check.C) {
+func TestRenderNoRows(t *testing.T) {
 	table := NewTable()
 	table.Headers = Row{"Word", "Number"}
 	expected := `+------+--------+
@@ -186,206 +186,190 @@ func (s *S) TestRenderNoRows(c *check.C) {
 +------+--------+
 +------+--------+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestRenderEmpty(c *check.C) {
+func TestRenderEmpty(t *testing.T) {
 	table := NewTable()
-	c.Assert(table.String(), check.Equals, "")
+	assert.Equal(t, "", table.String())
 }
 
-func (s *S) TestBytes(c *check.C) {
+func TestBytes(t *testing.T) {
 	table := NewTable()
 	table.AddRow(Row{"One", "1"})
 	table.AddRow(Row{"Two", "2"})
 	table.AddRow(Row{"Three", "3"})
-	c.Assert(table.Bytes(), check.DeepEquals, []byte(table.String()))
+	assert.Equal(t, []byte(table.String()), table.Bytes())
 }
 
-func (s *S) TestRowListAdd(c *check.C) {
+func TestRowListAdd(t *testing.T) {
 	l := rowSlice([]Row{{"one", "1"}})
 	l.add(Row{"two", "2"})
-	c.Assert(l, check.HasLen, 2)
+	assert.Len(t, l, 2)
 }
 
-func (s *S) TestRowListLen(c *check.C) {
+func TestRowListLen(t *testing.T) {
 	l := rowSlice([]Row{{"one", "1"}})
-	c.Assert(l.Len(), check.Equals, 1)
+	assert.Equal(t, 1, l.Len())
 	l.add(Row{"two", "2"})
-	c.Assert(l.Len(), check.Equals, 2)
+	assert.Equal(t, 2, l.Len())
 }
 
-func (s *S) TestRowListLess(c *check.C) {
+func TestRowListLess(t *testing.T) {
 	l := rowSlice([]Row{{"zero", "0"}, {"one", "1"}, {"two", "2"}})
-	c.Assert(l.Less(0, 1), check.Equals, false)
-	c.Assert(l.Less(0, 2), check.Equals, false)
-	c.Assert(l.Less(1, 2), check.Equals, true)
-	c.Assert(l.Less(1, 0), check.Equals, true)
+	assert.Equal(t, false, l.Less(0, 1))
+	assert.Equal(t, false, l.Less(0, 2))
+	assert.Equal(t, true, l.Less(1, 2))
+	assert.Equal(t, true, l.Less(1, 0))
 }
 
-func (s *S) TestRowListLessDifferentCase(c *check.C) {
+func TestRowListLessDifferentCase(t *testing.T) {
 	l := rowSlice([]Row{{"Zero", "0"}, {"one", "1"}, {"two", "2"}})
-	c.Assert(l.Less(0, 1), check.Equals, false)
-	c.Assert(l.Less(0, 2), check.Equals, false)
-	c.Assert(l.Less(1, 2), check.Equals, true)
-	c.Assert(l.Less(1, 0), check.Equals, true)
+	assert.Equal(t, false, l.Less(0, 1))
+	assert.Equal(t, false, l.Less(0, 2))
+	assert.Equal(t, true, l.Less(1, 2))
+	assert.Equal(t, true, l.Less(1, 0))
 }
 
-func (s *S) TestRowListSwap(c *check.C) {
+func TestRowListSwap(t *testing.T) {
 	l := rowSlice([]Row{{"zero", "0"}, {"one", "1"}, {"two", "2"}})
 	l.Swap(0, 2)
-	c.Assert(l.Less(0, 2), check.Equals, true)
+	assert.Equal(t, true, l.Less(0, 2))
 }
 
-func (s *S) TestRowListIsSortable(c *check.C) {
+func TestRowListIsSortable(t *testing.T) {
 	var _ sort.Interface = rowSlice{}
 }
 
-func (s *S) TestColorRed(c *check.C) {
-	output := Colorfy("must return a red font pattern", "red", "", "")
-	c.Assert(output, check.Equals, "\033[0;31;10mmust return a red font pattern\033[0m")
-}
-
-func (s *S) TestColorGreen(c *check.C) {
-	output := Colorfy("must return a green font pattern", "green", "", "")
-	c.Assert(output, check.Equals, "\033[0;32;10mmust return a green font pattern\033[0m")
-}
-
-func (s *S) TestColorBoldWhite(c *check.C) {
-	output := Colorfy("must return a bold white font pattern", "white", "", "bold")
-	c.Assert(output, check.Equals, "\033[1;37;10mmust return a bold white font pattern\033[0m")
-}
-
-func (s *S) TestColorBoldYellowGreenBG(c *check.C) {
-	output := Colorfy("must return a bold yellow with green background", "yellow", "green", "bold")
-	c.Assert(output, check.Equals, "\033[1;33;42mmust return a bold yellow with green background\033[0m")
-}
-
-func (s *S) TestResizeLargestColumn(c *check.C) {
-	t := NewTable()
-	t.AddRow(Row{"1", "abcdefghijk"})
-	t.AddRow(Row{"2", "1234567890"})
-	sizes := t.resizeLargestColumn(11)
-	c.Assert(sizes, check.DeepEquals, []int{1, 3})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", `ab↵
+func TestResizeLargestColumn(t *testing.T) {
+	tb := NewTable()
+	tb.AddRow(Row{"1", "abcdefghijk"})
+	tb.AddRow(Row{"2", "1234567890"})
+	sizes := tb.resizeLargestColumn(11)
+	assert.Equal(t, []int{1, 3}, sizes)
+	assert.Equal(t, Row{"1", `ab↵
 cd↵
 ef↵
 gh↵
 ij↵
-k`})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", `12↵
+k`}, tb.rows[0])
+	assert.Equal(t, Row{"2", `12↵
 34↵
 56↵
 78↵
-90`})
+90`}, tb.rows[1])
 }
 
-func (s *S) TestResizeLargestColumnOnMiddle(c *check.C) {
-	t := NewTable()
-	t.AddRow(Row{"1", "abcdefghijk", "x"})
-	t.AddRow(Row{"2", "1234567890", "y"})
-	sizes := t.resizeLargestColumn(15)
-	c.Assert(sizes, check.DeepEquals, []int{1, 3, 1})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", `ab↵
+func TestResizeLargestColumnOnMiddle(t *testing.T) {
+	tb := NewTable()
+	tb.AddRow(Row{"1", "abcdefghijk", "x"})
+	tb.AddRow(Row{"2", "1234567890", "y"})
+	sizes := tb.resizeLargestColumn(15)
+	assert.Equal(t, []int{1, 3, 1}, sizes)
+	assert.Equal(t, Row{"1", `ab↵
 cd↵
 ef↵
 gh↵
 ij↵
-k`, "x"})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", `12↵
+k`, "x"}, tb.rows[0])
+	assert.Equal(t, Row{"2", `12↵
 34↵
 56↵
 78↵
-90`, "y"})
+90`, "y"}, tb.rows[1])
 }
 
-func (s *S) TestResizeLargestColumnNoTTYSize(c *check.C) {
-	t := NewTable()
-	t.AddRow(Row{"1", "abcdefghijk"})
-	t.AddRow(Row{"2", "1234567890"})
-	sizes := t.resizeLargestColumn(0)
-	c.Assert(sizes, check.DeepEquals, []int{1, 11})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", "abcdefghijk"})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", "1234567890"})
+func TestResizeLargestColumnNoTTYSize(t *testing.T) {
+	tb := NewTable()
+	tb.AddRow(Row{"1", "abcdefghijk"})
+	tb.AddRow(Row{"2", "1234567890"})
+	sizes := tb.resizeLargestColumn(0)
+	assert.Equal(t, []int{1, 11}, sizes)
+	assert.Equal(t, Row{"1", "abcdefghijk"}, tb.rows[0])
+	assert.Equal(t, Row{"2", "1234567890"}, tb.rows[1])
 }
 
-func (s *S) TestResizeLargestColumnNotEnoughSpace(c *check.C) {
-	t := NewTable()
-	t.AddRow(Row{"1", "abcdefghijk"})
-	t.AddRow(Row{"2", "1234567890"})
-	sizes := t.resizeLargestColumn(9)
-	c.Assert(sizes, check.DeepEquals, []int{1, 11})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", "abcdefghijk"})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", "1234567890"})
+func TestResizeLargestColumnNotEnoughSpace(t *testing.T) {
+	tb := NewTable()
+	tb.AddRow(Row{"1", "abcdefghijk"})
+	tb.AddRow(Row{"2", "1234567890"})
+	sizes := tb.resizeLargestColumn(9)
+	assert.Equal(t, []int{1, 11}, sizes)
+	assert.Equal(t, Row{"1", "abcdefghijk"}, tb.rows[0])
+	assert.Equal(t, Row{"2", "1234567890"}, tb.rows[1])
 }
 
-func (s *S) TestResizeLargestColumnWithLineBreaks(c *check.C) {
-	t := NewTable()
-	t.AddRow(Row{"1", "abcde\nfgh\ni\njklm"})
-	sizes := t.resizeLargestColumn(12)
-	c.Assert(sizes, check.DeepEquals, []int{1, 4})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", `abc↵
+func TestResizeLargestColumnWithLineBreaks(t *testing.T) {
+	tb := NewTable()
+	tb.AddRow(Row{"1", "abcde\nfgh\ni\njklm"})
+	sizes := tb.resizeLargestColumn(12)
+	assert.Equal(t, []int{1, 4}, sizes)
+	assert.Equal(t, Row{"1", `abc↵
 de
 fgh
 i
 jkl↵
-m`})
+m`}, tb.rows[0])
 }
 
-func (s *S) TestResizeLargestColumnWithColors(c *check.C) {
-	t := NewTable()
-	color1 := Colorfy("abcdefghijk", "red", "", "")
-	color2 := Colorfy("1234567890", "red", "", "")
-	color3 := "123" + Colorfy("456789", "red", "", "") + "012"
-	t.AddRow(Row{"1", color1})
-	t.AddRow(Row{"2", color2})
-	t.AddRow(Row{"3", color3})
-	sizes := t.resizeLargestColumn(11)
-	c.Assert(sizes, check.DeepEquals, []int{1, 3})
+func withColor(s string) string {
+	return fmt.Sprintf("\033[0;31;10m%s\033[0m", s)
+}
+
+func TestResizeLargestColumnWithColors(t *testing.T) {
+	tb := NewTable()
+	color1 := withColor("abcdefghijk")
+	color2 := withColor("1234567890")
+	color3 := "123" + withColor("456789") + "012"
+	tb.AddRow(Row{"1", color1})
+	tb.AddRow(Row{"2", color2})
+	tb.AddRow(Row{"3", color3})
+	sizes := tb.resizeLargestColumn(11)
+	assert.Equal(t, []int{1, 3}, sizes)
 	redInit := "\033[0;31;10m"
 	colorReset := "\033[0m"
 	colorResetBreak := "\033[0m\n"
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", redInit + "ab↵" + colorResetBreak +
+	assert.Equal(t, Row{"1", redInit + "ab↵" + colorResetBreak +
 		redInit + "cd↵" + colorResetBreak +
 		redInit + "ef↵" + colorResetBreak +
 		redInit + "gh↵" + colorResetBreak +
 		redInit + "ij↵" + colorResetBreak +
-		redInit + "k" + colorReset})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", redInit + "12↵" + colorResetBreak +
+		redInit + "k" + colorReset}, tb.rows[0])
+	assert.Equal(t, Row{"2", redInit + "12↵" + colorResetBreak +
 		redInit + "34↵" + colorResetBreak +
 		redInit + "56↵" + colorResetBreak +
 		redInit + "78↵" + colorResetBreak +
-		redInit + "90" + colorReset})
-	c.Assert(t.rows[2], check.DeepEquals, Row{"3", "12↵\n" +
+		redInit + "90" + colorReset}, tb.rows[1])
+	assert.Equal(t, Row{"3", "12↵\n" +
 		"3" + redInit + "4↵" + colorResetBreak +
 		redInit + "56↵" + colorResetBreak +
 		redInit + "78↵" + colorResetBreak +
 		redInit + "9" + colorReset + "0↵\n" +
-		"12"})
+		"12"}, tb.rows[2])
 }
 
-func (s *S) TestResizeLargestColumnUnicode(c *check.C) {
-	t := NewTable()
-	t.AddRow(Row{"1", "åß∂¬ƒ˚©“œ¡™"})
-	t.AddRow(Row{"2", "åß∂¬ƒ˚©“œ¡"})
-	sizes := t.resizeLargestColumn(11)
-	c.Assert(sizes, check.DeepEquals, []int{1, 3})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", `åß↵
+func TestResizeLargestColumnUnicode(t *testing.T) {
+	tb := NewTable()
+	tb.AddRow(Row{"1", "åß∂¬ƒ˚©“œ¡™"})
+	tb.AddRow(Row{"2", "åß∂¬ƒ˚©“œ¡"})
+	sizes := tb.resizeLargestColumn(11)
+	assert.Equal(t, []int{1, 3}, sizes)
+	assert.Equal(t, Row{"1", `åß↵
 ∂¬↵
 ƒ˚↵
 ©“↵
 œ¡↵
-™`})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", `åß↵
+™`}, tb.rows[0])
+	assert.Equal(t, Row{"2", `åß↵
 ∂¬↵
 ƒ˚↵
 ©“↵
-œ¡`})
+œ¡`}, tb.rows[1])
 }
 
-func (s *S) TestColoredString(c *check.C) {
+func TestColoredString(t *testing.T) {
 	table := NewTable()
-	two := Colorfy("str", "red", "", "")
+	two := withColor("str")
 	two = two + " - " + two
 	table.AddRow(Row{"Some large string", "1"})
 	table.AddRow(Row{two, "2"})
@@ -396,74 +380,73 @@ func (s *S) TestColoredString(c *check.C) {
 | Three             | 3 |
 +-------------------+---+
 `
-	c.Assert(table.String(), check.Equals, expected)
+	assert.Equal(t, expected, table.String())
 }
 
-func (s *S) TestResizeLargestColumnOnWhitespace(c *check.C) {
-	t := NewTable()
-	t.AddRow(Row{"1", "abc def ghi jk"})
-	t.AddRow(Row{"2", "12 3 456 7890"})
-	t.AddRow(Row{"3", "1 2 3 4"})
-	sizes := t.resizeLargestColumn(12)
-	c.Assert(sizes, check.DeepEquals, []int{1, 4})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", `abc↵
+func TestResizeLargestColumnOnWhitespace(t *testing.T) {
+	tb := NewTable()
+	tb.AddRow(Row{"1", "abc def ghi jk"})
+	tb.AddRow(Row{"2", "12 3 456 7890"})
+	tb.AddRow(Row{"3", "1 2 3 4"})
+	sizes := tb.resizeLargestColumn(12)
+	assert.Equal(t, []int{1, 4}, sizes)
+	assert.Equal(t, Row{"1", `abc↵
 def↵
 ghi↵
-jk`})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", `12 ↵
+jk`}, tb.rows[0])
+	assert.Equal(t, Row{"2", `12 ↵
 3  ↵
 456↵
 789↵
-0`})
-	c.Assert(t.rows[2], check.DeepEquals, Row{"3", `1 2↵
-3 4`})
+0`}, tb.rows[1])
+	assert.Equal(t, Row{"3", `1 2↵
+3 4`}, tb.rows[2])
 }
 
-func (s *S) TestResizeLargestColumnOnAnyWithBreakAny(c *check.C) {
-	err := os.Setenv("TSURU_BREAK_ANY", "1")
-	c.Assert(err, check.IsNil)
-	defer os.Unsetenv("TSURU_BREAK_ANY")
-	t := NewTable()
-	t.AddRow(Row{"1", "abc def ghi jk"})
-	t.AddRow(Row{"2", "12 3 456 7890"})
-	t.AddRow(Row{"3", "1 2 3 4"})
-	sizes := t.resizeLargestColumn(12)
-	c.Assert(sizes, check.DeepEquals, []int{1, 4})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", `abc↵
+func TestResizeLargestColumnOnAnyWithBreakAny(t *testing.T) {
+	TableConfig.BreakOnAny = true
+	defer func() { TableConfig.BreakOnAny = false }()
+	tb := NewTable()
+	tb.AddRow(Row{"1", "abc def ghi jk"})
+	tb.AddRow(Row{"2", "12 3 456 7890"})
+	tb.AddRow(Row{"3", "1 2 3 4"})
+	sizes := tb.resizeLargestColumn(12)
+	assert.Equal(t, []int{1, 4}, sizes)
+	assert.Equal(t, Row{"1", `abc↵
  de↵
 f g↵
 hi ↵
-jk`})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", `12 ↵
+jk`}, tb.rows[0])
+	assert.Equal(t, Row{"2", `12 ↵
 3 4↵
 56 ↵
 789↵
-0`})
-	c.Assert(t.rows[2], check.DeepEquals, Row{"3", `1 2↵
+0`}, tb.rows[1])
+	assert.Equal(t, Row{"3", `1 2↵
  3 ↵
-4`})
+4`}, tb.rows[2])
 }
 
-func (s *S) TestResizeLargestColumnOnBreakableChars(c *check.C) {
-	t := NewTable()
-	t.AddRow(Row{"1", "abc:def ghi jk"})
-	t.AddRow(Row{"2", "12:3 456 7890"})
-	t.AddRow(Row{"3", "1 2 3: 4"})
-	sizes := t.resizeLargestColumn(12)
-	c.Assert(sizes, check.DeepEquals, []int{1, 4})
-	c.Assert(t.rows[0], check.DeepEquals, Row{"1", `abc↵
+func TestResizeLargestColumnOnBreakableChars(t *testing.T) {
+	tb := NewTable()
+	tb.AddRow(Row{"1", "abc:def ghi jk"})
+	tb.AddRow(Row{"2", "12:3 456 7890"})
+	tb.AddRow(Row{"3", "1 2 3: 4"})
+	sizes := tb.resizeLargestColumn(12)
+	assert.Equal(t, []int{1, 4}, sizes)
+	assert.Equal(t, Row{"1", `abc↵
 :de↵
 f  ↵
 ghi↵
-jk`})
-	c.Assert(t.rows[1], check.DeepEquals, Row{"2", `12:↵
+jk`}, tb.rows[0])
+	assert.Equal(t, Row{"2", `12:↵
 3  ↵
 456↵
 789↵
-0`})
-	c.Assert(t.rows[2], check.DeepEquals, Row{"3", `1 2↵
+0`}, tb.rows[1])
+	assert.Equal(t, Row{"3", `1 2↵
 3: ↵
-4`})
+4`}, tb.rows[2])
 }
 
 func BenchmarkString(b *testing.B) {
