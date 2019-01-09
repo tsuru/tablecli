@@ -5,9 +5,9 @@
 package tablecli
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -74,7 +74,7 @@ func TestColumnsSize(t *testing.T) {
 func TestSeparator(t *testing.T) {
 	table := NewTable()
 	expected := "+-------+---+\n"
-	buf := bytes.NewBuffer(nil)
+	buf := &strings.Builder{}
 	table.separator(buf, []int{5, 1})
 	assert.Equal(t, expected, buf.String())
 }
@@ -450,6 +450,42 @@ jk`}, tb.rows[0])
 }
 
 func BenchmarkString(b *testing.B) {
+	b.StopTimer()
+	table := NewTable()
+	table.Headers = Row{"row 1", "row 2", "row 3", "row 4"}
+	for i := 0; i < 100; i++ {
+		table.AddRow(Row{"my big string", "other string", "small", `largest string in the whole table
+continuing string
+another line
+yet another big line`})
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_ = table.String()
+	}
+}
+
+func BenchmarkStringWithColor(b *testing.B) {
+	b.StopTimer()
+	table := NewTable()
+	table.Headers = Row{"row 1", "row 2", "row 3", "row 4"}
+	for i := 0; i < 100; i++ {
+		table.AddRow(Row{"my " + withColor("big") + " string", withColor("other string"), "small", `largest string in the whole table
+continuing string
+another line
+yet another big line`})
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_ = table.String()
+	}
+}
+
+func BenchmarkStringWithResize(b *testing.B) {
+	TableConfig.MaxTTYWidth = 52
+	defer func() {
+		TableConfig.MaxTTYWidth = 0
+	}()
 	b.StopTimer()
 	table := NewTable()
 	table.Headers = Row{"row 1", "row 2", "row 3", "row 4"}
