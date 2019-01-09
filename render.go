@@ -12,22 +12,27 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/ssh/terminal"
 )
 
 var TableConfig = struct {
-	BreakOnAny bool
-	ForceWrap  bool
+	BreakOnAny  bool
+	ForceWrap   bool
+	MaxTTYWidth int
 }{
-	BreakOnAny: false,
-	ForceWrap:  false,
+	BreakOnAny:  false,
+	ForceWrap:   false,
+	MaxTTYWidth: 0,
 }
 
 var ignoredPatterns = []*regexp.Regexp{
 	regexp.MustCompile("\033\\[\\d+;\\d+;\\d+m"),
 	regexp.MustCompile("\033\\[0m"),
 }
+
+var ignoredPattern = regexp.MustCompile("\033\\[\\d+;\\d+;\\d+m|\033\\[0m")
 
 type Table struct {
 	Headers       Row
@@ -54,7 +59,7 @@ func (t *Table) SortByColumn(columns ...int) {
 	sort.Sort(rowSliceByColumn{rowSlice: t.rows, columns: columns})
 }
 
-func (t *Table) addRows(rows rowSlice, sizes []int, buf *bytes.Buffer) {
+func (t *Table) addRows(rows rowSlice, sizes []int, buf *strings.Builder) {
 	for _, row := range rows {
 		extraRows := rowSlice{}
 		for column, field := range row {
@@ -216,8 +221,11 @@ func (t *Table) String() string {
 	if terminal.IsTerminal(terminalFd) {
 		ttyWidth, _, _ = terminal.GetSize(terminalFd)
 	}
+	if TableConfig.MaxTTYWidth > 0 && (ttyWidth == 0 || ttyWidth > TableConfig.MaxTTYWidth) {
+		ttyWidth = TableConfig.MaxTTYWidth
+	}
 	sizes := t.resizeLargestColumn(ttyWidth)
-	buf := bytes.NewBuffer(nil)
+	buf := &strings.Builder{}
 	t.separator(buf, sizes)
 	if t.Headers != nil {
 		for column, header := range t.Headers {
@@ -248,10 +256,20 @@ func (t *Table) Rows() int {
 }
 
 func runeLen(s string) int {
-	for _, p := range ignoredPatterns {
-		s = p.ReplaceAllString(s, "")
+	if strings.IndexByte(s, '\033') == -1 {
+		return utf8.RuneCountInString(s)
 	}
-	return len([]rune(s))
+	positions := ignoredPattern.FindAllStringIndex(s, -1)
+	if len(positions) == 0 {
+		return utf8.RuneCountInString(s)
+	}
+	var count int
+	start := 0
+	for _, pos := range positions {
+		count += utf8.RuneCountInString(s[start:pos[0]])
+		start = pos[1]
+	}
+	return count
 }
 
 func (t *Table) columnsSize() []int {
@@ -284,7 +302,7 @@ func (t *Table) columnsSize() []int {
 	return sizes
 }
 
-func (t *Table) separator(buf *bytes.Buffer, sizes []int) {
+func (t *Table) separator(buf *strings.Builder, sizes []int) {
 	for _, sz := range sizes {
 		buf.WriteString("+")
 		buf.Write(bytes.Repeat([]byte("-"), sz+2))
