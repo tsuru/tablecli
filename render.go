@@ -6,11 +6,13 @@ package tablecli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"reflect"
 	"regexp"
 	"sort"
 	"strings"
+	"text/tabwriter"
 	"unicode"
 	"unicode/utf8"
 
@@ -18,13 +20,15 @@ import (
 )
 
 var TableConfig = struct {
-	BreakOnAny  bool
-	ForceWrap   bool
-	MaxTTYWidth int
+	BreakOnAny   bool
+	ForceWrap    bool
+	UseTabWriter bool
+	MaxTTYWidth  int
 }{
-	BreakOnAny:  false,
-	ForceWrap:   false,
-	MaxTTYWidth: 0,
+	BreakOnAny:   false,
+	ForceWrap:    false,
+	UseTabWriter: false,
+	MaxTTYWidth:  0,
 }
 
 var ignoredPatterns = []*regexp.Regexp{
@@ -210,6 +214,22 @@ func (t *Table) resizeLargestColumn(ttyWidth int) []int {
 }
 
 func (t *Table) String() string {
+	if TableConfig.UseTabWriter {
+		buf := bytes.NewBuffer(nil)
+		w := tabwriter.NewWriter(buf, 10, 4, 3, ' ', 0)
+		if len(t.Headers) > 0 {
+			fmt.Fprintln(w, strings.Join(t.Headers, "\t"))
+		}
+		for _, row := range t.rows {
+			newRow := make([]string, len(row))
+			for i, column := range row {
+				newRow[i] = strings.Replace(column, "\n", "|", -1)
+			}
+			fmt.Fprintln(w, strings.Join(newRow, "\t"))
+		}
+		w.Flush()
+		return buf.String()
+	}
 	if t.Headers == nil && len(t.rows) < 1 {
 		return ""
 	}

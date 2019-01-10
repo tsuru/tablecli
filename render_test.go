@@ -449,6 +449,40 @@ jk`}, tb.rows[0])
 4`}, tb.rows[2])
 }
 
+func TestStringTabWriter(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.Headers = Row{"Word", "Number"}
+	table.AddRow(Row{"One", "1"})
+	table.AddRow(Row{"Two", "2"})
+	table.AddRow(Row{"Three", "3"})
+	expected := `Word      Number
+One       1
+Two       2
+Three     3
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestStringTabWriterMultiline(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.AddRow(Row{"One", "1", ""})
+	table.AddRow(Row{"Two", "xxx|yyy", "aa|bb|cc|dd"})
+	table.AddRow(Row{"Three", "3", ""})
+	expected := `One       1         
+Two       xxx|yyy   aa|bb|cc|dd
+Three     3         
+`
+	assert.Equal(t, expected, table.String())
+}
+
 func BenchmarkString(b *testing.B) {
 	b.StopTimer()
 	table := NewTable()
