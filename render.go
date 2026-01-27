@@ -25,11 +25,15 @@ var TableConfig = struct {
 	ForceWrap    bool
 	UseTabWriter bool
 	MaxTTYWidth  int
+
+	TabWriterTruncate bool
 }{
 	BreakOnAny:   false,
 	ForceWrap:    false,
 	UseTabWriter: false,
 	MaxTTYWidth:  0,
+
+	TabWriterTruncate: true,
 }
 
 var ignoredPatterns = []*regexp.Regexp{
@@ -43,6 +47,9 @@ type Table struct {
 	Headers       Row
 	LineSeparator bool
 	rows          rowSlice
+
+	DisableTableWriterTruncate bool
+	TableWriterPadding         int
 }
 
 type Row []string
@@ -226,24 +233,40 @@ func getNewTabWriter(output io.Writer) *tabwriter.Writer {
 	return tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, 0)
 }
 
+var tableWriterReplacer = strings.NewReplacer(
+	"\f", " ",
+	"\n", " ",
+	"\r", " ",
+)
+
 func (t *Table) renderUsingTabWriter() string {
 	buf := bytes.NewBuffer(nil)
 	w := getNewTabWriter(buf)
+	padding := strings.Repeat(" ", t.TableWriterPadding)
 
 	if len(t.Headers) > 0 {
 		capitalizedHeaders := []string{}
 		for _, header := range t.Headers {
 			capitalizedHeaders = append(capitalizedHeaders, strings.ToUpper(header))
 		}
-		fmt.Fprintln(w, strings.Join(capitalizedHeaders, "\t"))
+		fmt.Fprintln(w, padding+strings.Join(capitalizedHeaders, "\t"))
 	}
 
 	for _, row := range t.rows {
 		newRow := make([]string, len(row))
 		for i, column := range row {
-			newRow[i] = strings.ReplaceAll(column, "\n", " ")
+			breakchar := strings.IndexAny(column, "\f\n\r")
+			if breakchar >= 0 {
+				if TableConfig.TabWriterTruncate && !t.DisableTableWriterTruncate {
+					column = column[:breakchar] + " ..."
+				} else {
+					column = tableWriterReplacer.Replace(column)
+				}
+			}
+
+			newRow[i] = column
 		}
-		fmt.Fprintln(w, strings.Join(newRow, "\t"))
+		fmt.Fprintln(w, padding+strings.Join(newRow, "\t"))
 	}
 	w.Flush()
 	return buf.String()

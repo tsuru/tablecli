@@ -476,9 +476,122 @@ func TestStringTabWriterMultiline(t *testing.T) {
 	table.AddRow(Row{"One", "1", ""})
 	table.AddRow(Row{"Two", "xxx\nyyy", "aa|bb|cc|dd"})
 	table.AddRow(Row{"Three", "3", ""})
-	expected := `One     1         
-Two     xxx yyy   aa|bb|cc|dd
-Three   3         
+	expected := "One     1         \nTwo     xxx ...   aa|bb|cc|dd\nThree   3         \n"
+	assert.Equal(t, expected, table.String())
+}
+
+func TestStringTabWriterTruncateEnabled(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	TableConfig.TabWriterTruncate = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+		TableConfig.TabWriterTruncate = true
+	}()
+	table := NewTable()
+	table.Headers = Row{"Name", "Description"}
+	table.AddRow(Row{"Item1", "Single line"})
+	table.AddRow(Row{"Item2", "First line\nSecond line\nThird line"})
+	table.AddRow(Row{"Item3", "Another single"})
+	expected := `NAME    DESCRIPTION
+Item1   Single line
+Item2   First line ...
+Item3   Another single
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestStringTabWriterTruncateDisabled(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	TableConfig.TabWriterTruncate = false
+	defer func() {
+		TableConfig.UseTabWriter = false
+		TableConfig.TabWriterTruncate = true
+	}()
+	table := NewTable()
+	table.Headers = Row{"Name", "Description"}
+	table.AddRow(Row{"Item1", "Single line"})
+	table.AddRow(Row{"Item2", "First line\nSecond line"})
+	table.AddRow(Row{"Item3", "Another single"})
+	expected := `NAME    DESCRIPTION
+Item1   Single line
+Item2   First line Second line
+Item3   Another single
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestStringTabWriterDisableTableTruncate(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	TableConfig.TabWriterTruncate = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+		TableConfig.TabWriterTruncate = true
+	}()
+	table := NewTable()
+	table.DisableTableWriterTruncate = true
+	table.Headers = Row{"Name", "Description"}
+	table.AddRow(Row{"Item1", "Single line"})
+	table.AddRow(Row{"Item2", "First line\nSecond line"})
+	expected := `NAME    DESCRIPTION
+Item1   Single line
+Item2   First line Second line
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestStringTabWriterPadding(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterPadding = 2
+	table.Headers = Row{"Word", "Number"}
+	table.AddRow(Row{"One", "1"})
+	table.AddRow(Row{"Two", "2"})
+	expected := `  WORD   NUMBER
+  One    1
+  Two    2
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestStringTabWriterFormFeedAndCarriageReturn(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	TableConfig.TabWriterTruncate = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+		TableConfig.TabWriterTruncate = true
+	}()
+	table := NewTable()
+	table.Headers = Row{"Name", "Value"}
+	table.AddRow(Row{"FormFeed", "before\fafter"})
+	table.AddRow(Row{"CarriageReturn", "before\rafter"})
+	table.AddRow(Row{"Mixed", "a\fb\nc\rd"})
+	expected := `NAME             VALUE
+FormFeed         before ...
+CarriageReturn   before ...
+Mixed            a ...
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestStringTabWriterFormFeedAndCarriageReturnNoTruncate(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	TableConfig.TabWriterTruncate = false
+	defer func() {
+		TableConfig.UseTabWriter = false
+		TableConfig.TabWriterTruncate = true
+	}()
+	table := NewTable()
+	table.Headers = Row{"Name", "Value"}
+	table.AddRow(Row{"FormFeed", "before\fafter"})
+	table.AddRow(Row{"CarriageReturn", "before\rafter"})
+	table.AddRow(Row{"Mixed", "a\fb\nc\rd"})
+	expected := `NAME             VALUE
+FormFeed         before after
+CarriageReturn   before after
+Mixed            a b c d
 `
 	assert.Equal(t, expected, table.String())
 }
