@@ -33,7 +33,7 @@ var TableConfig = struct {
 	UseTabWriter: false,
 	MaxTTYWidth:  0,
 
-	TabWriterTruncate: true,
+	TabWriterTruncate: false,
 }
 
 var ignoredPatterns = []*regexp.Regexp{
@@ -48,8 +48,8 @@ type Table struct {
 	LineSeparator bool
 	rows          rowSlice
 
-	DisableTableWriterTruncate bool
-	TableWriterPadding         int
+	TableWriterTruncate bool
+	TableWriterPadding  int
 }
 
 type Row []string
@@ -257,7 +257,7 @@ func (t *Table) renderUsingTabWriter() string {
 		for i, column := range row {
 			breakchar := strings.IndexAny(column, "\f\n\r")
 			if breakchar >= 0 {
-				if TableConfig.TabWriterTruncate && !t.DisableTableWriterTruncate {
+				if TableConfig.TabWriterTruncate || t.TableWriterTruncate {
 					column = column[:breakchar] + " ..."
 				} else {
 					column = tableWriterReplacer.Replace(column)
