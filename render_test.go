@@ -459,10 +459,10 @@ func TestStringTabWriter(t *testing.T) {
 	table.AddRow(Row{"One", "1"})
 	table.AddRow(Row{"Two", "2"})
 	table.AddRow(Row{"Three", "3"})
-	expected := `Word      Number
-One       1
-Two       2
-Three     3
+	expected := `WORD    NUMBER
+One     1
+Two     2
+Three   3
 `
 	assert.Equal(t, expected, table.String())
 }
@@ -474,11 +474,11 @@ func TestStringTabWriterMultiline(t *testing.T) {
 	}()
 	table := NewTable()
 	table.AddRow(Row{"One", "1", ""})
-	table.AddRow(Row{"Two", "xxx|yyy", "aa|bb|cc|dd"})
+	table.AddRow(Row{"Two", "xxx\nyyy", "aa|bb|cc|dd"})
 	table.AddRow(Row{"Three", "3", ""})
-	expected := `One       1         
-Two       xxx|yyy   aa|bb|cc|dd
-Three     3         
+	expected := `One     1         
+Two     xxx yyy   aa|bb|cc|dd
+Three   3         
 `
 	assert.Equal(t, expected, table.String())
 }

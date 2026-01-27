@@ -7,6 +7,7 @@ package tablecli
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"regexp"
@@ -16,7 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 var TableConfig = struct {
@@ -213,22 +214,44 @@ func (t *Table) resizeLargestColumn(ttyWidth int) []int {
 	return t.columnsSize()
 }
 
+const (
+	tabwriterMinWidth = 6
+	tabwriterWidth    = 4
+	tabwriterPadding  = 3
+	tabwriterPadChar  = ' '
+)
+
+// getNewTabWriter returns a tabwriter that translates tabbed columns in input into properly aligned text.
+func getNewTabWriter(output io.Writer) *tabwriter.Writer {
+	return tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, 0)
+}
+
+func (t *Table) renderUsingTabWriter() string {
+	buf := bytes.NewBuffer(nil)
+	w := getNewTabWriter(buf)
+
+	if len(t.Headers) > 0 {
+		capitalizedHeaders := []string{}
+		for _, header := range t.Headers {
+			capitalizedHeaders = append(capitalizedHeaders, strings.ToUpper(header))
+		}
+		fmt.Fprintln(w, strings.Join(capitalizedHeaders, "\t"))
+	}
+
+	for _, row := range t.rows {
+		newRow := make([]string, len(row))
+		for i, column := range row {
+			newRow[i] = strings.ReplaceAll(column, "\n", " ")
+		}
+		fmt.Fprintln(w, strings.Join(newRow, "\t"))
+	}
+	w.Flush()
+	return buf.String()
+}
+
 func (t *Table) String() string {
 	if TableConfig.UseTabWriter {
-		buf := bytes.NewBuffer(nil)
-		w := tabwriter.NewWriter(buf, 10, 4, 3, ' ', 0)
-		if len(t.Headers) > 0 {
-			fmt.Fprintln(w, strings.Join(t.Headers, "\t"))
-		}
-		for _, row := range t.rows {
-			newRow := make([]string, len(row))
-			for i, column := range row {
-				newRow[i] = strings.Replace(column, "\n", "|", -1)
-			}
-			fmt.Fprintln(w, strings.Join(newRow, "\t"))
-		}
-		w.Flush()
-		return buf.String()
+		return t.renderUsingTabWriter()
 	}
 	if t.Headers == nil && len(t.rows) < 1 {
 		return ""
@@ -238,8 +261,8 @@ func (t *Table) String() string {
 	if TableConfig.ForceWrap {
 		terminalFd = int(os.Stdin.Fd())
 	}
-	if terminal.IsTerminal(terminalFd) {
-		ttyWidth, _, _ = terminal.GetSize(terminalFd)
+	if term.IsTerminal(terminalFd) {
+		ttyWidth, _, _ = term.GetSize(terminalFd)
 	}
 	if TableConfig.MaxTTYWidth > 0 && (ttyWidth == 0 || ttyWidth > TableConfig.MaxTTYWidth) {
 		ttyWidth = TableConfig.MaxTTYWidth
