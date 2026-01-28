@@ -6,14 +6,11 @@ package tablecli
 
 import (
 	"bytes"
-	"fmt"
-	"io"
 	"os"
 	"reflect"
 	"regexp"
 	"sort"
 	"strings"
-	"text/tabwriter"
 	"unicode"
 	"unicode/utf8"
 
@@ -221,60 +218,88 @@ func (t *Table) resizeLargestColumn(ttyWidth int) []int {
 	return t.columnsSize()
 }
 
-const (
-	tabwriterMinWidth = 6
-	tabwriterWidth    = 4
-	tabwriterPadding  = 3
-	tabwriterPadChar  = ' '
-)
-
-// getNewTabWriter returns a tabwriter that translates tabbed columns in input into properly aligned text.
-func getNewTabWriter(output io.Writer) *tabwriter.Writer {
-	return tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, 0)
-}
-
 var tableWriterReplacer = strings.NewReplacer(
 	"\f", " ",
 	"\n", " ",
 	"\r", " ",
 )
 
-func (t *Table) renderUsingTabWriter() string {
-	buf := bytes.NewBuffer(nil)
-	w := getNewTabWriter(buf)
+func (t *Table) renderUsingTabWriterLike() string {
 	padding := strings.Repeat(" ", t.TableWriterPadding)
 
-	if len(t.Headers) > 0 {
-		capitalizedHeaders := []string{}
-		for _, header := range t.Headers {
-			capitalizedHeaders = append(capitalizedHeaders, strings.ToUpper(header))
-		}
-		fmt.Fprintln(w, padding+strings.Join(capitalizedHeaders, "\t"))
-	}
-
-	for _, row := range t.rows {
-		newRow := make([]string, len(row))
-		for i, column := range row {
-			breakchar := strings.IndexAny(column, "\f\n\r")
-			if breakchar >= 0 {
+	// Process rows and calculate column widths
+	processedRows := make([][]string, len(t.rows))
+	for i, row := range t.rows {
+		processedRows[i] = make([]string, len(row))
+		for j, col := range row {
+			if idx := strings.IndexAny(col, "\f\n\r"); idx >= 0 {
 				if TableConfig.TabWriterTruncate || t.TableWriterTruncate {
-					column = column[:breakchar] + " ..."
+					col = col[:idx] + " ..."
 				} else {
-					column = tableWriterReplacer.Replace(column)
+					col = tableWriterReplacer.Replace(col)
 				}
 			}
-
-			newRow[i] = column
+			processedRows[i][j] = col
 		}
-		fmt.Fprintln(w, padding+strings.Join(newRow, "\t"))
 	}
-	w.Flush()
+
+	// Calculate column widths
+	var numCols int
+	if len(t.Headers) > 0 {
+		numCols = len(t.Headers)
+	} else if len(processedRows) > 0 {
+		numCols = len(processedRows[0])
+	}
+	widths := make([]int, numCols)
+	for i, h := range t.Headers {
+		if w := runeLen(h); w > widths[i] {
+			widths[i] = w
+		}
+	}
+	for _, row := range processedRows {
+		for i, col := range row {
+			if i < numCols {
+				if w := runeLen(col); w > widths[i] {
+					widths[i] = w
+				}
+			}
+		}
+	}
+
+	// Build output
+	var buf strings.Builder
+	if len(t.Headers) > 0 {
+		buf.WriteString(padding)
+		for i, h := range t.Headers {
+			if i > 0 {
+				buf.WriteString("   ")
+			}
+			buf.WriteString(strings.ToUpper(h))
+			if i < numCols-1 {
+				buf.WriteString(strings.Repeat(" ", widths[i]-runeLen(h)))
+			}
+		}
+		buf.WriteString("\n")
+	}
+	for _, row := range processedRows {
+		buf.WriteString(padding)
+		for i, col := range row {
+			if i > 0 {
+				buf.WriteString("   ")
+			}
+			buf.WriteString(col)
+			if i < numCols-1 {
+				buf.WriteString(strings.Repeat(" ", widths[i]-runeLen(col)))
+			}
+		}
+		buf.WriteString("\n")
+	}
 	return buf.String()
 }
 
 func (t *Table) String() string {
 	if TableConfig.UseTabWriter {
-		return t.renderUsingTabWriter()
+		return t.renderUsingTabWriterLike()
 	}
 	if t.Headers == nil && len(t.rows) < 1 {
 		return ""

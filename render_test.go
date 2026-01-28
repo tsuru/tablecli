@@ -599,6 +599,42 @@ Mixed            a b c d
 	assert.Equal(t, expected, table.String())
 }
 
+func TestStringTabWriterWithANSIColors(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.Headers = Row{"ID", "Status", "Name"}
+	// ANSI color codes: \033[33;1;1m = yellow, \033[0m = reset
+	yellow := func(s string) string { return "\033[33;1;1m" + s + "\033[0m" }
+	red := func(s string) string { return "\033[31;1;1m" + s + "\033[0m" }
+	table.AddRow(Row{"abc123", "ok", "app1"})
+	table.AddRow(Row{yellow("def456"), yellow("running"), yellow("…")})
+	table.AddRow(Row{red("ghi789"), red("error"), red("app3")})
+	output := table.String()
+
+	// Verify alignment is correct (columns should align despite ANSI codes)
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 5) // header + 3 rows + trailing newline
+
+	// Check that ANSI codes are preserved in output
+	assert.Contains(t, output, "\033[33;1;1m")
+	assert.Contains(t, output, "\033[31;1;1m")
+	assert.Contains(t, output, "\033[0m")
+
+	// Verify the colored content is present
+	assert.Contains(t, output, "def456")
+	assert.Contains(t, output, "running")
+	assert.Contains(t, output, "error")
+	assert.Contains(t, output, "…")
+
+	assert.Equal(t, 23, runeLen(lines[1])) // First row
+	assert.Equal(t, 20, runeLen(lines[2])) // Second row
+	assert.Equal(t, 23, runeLen(lines[3])) // Third row
+	assert.Equal(t, 0, runeLen(lines[4]))  // Trailing newline
+}
+
 func BenchmarkString(b *testing.B) {
 	b.StopTimer()
 	table := NewTable()
