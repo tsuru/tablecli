@@ -45,8 +45,9 @@ type Table struct {
 	LineSeparator bool
 	rows          rowSlice
 
-	TableWriterTruncate bool
-	TableWriterPadding  int
+	TableWriterTruncate   bool
+	TableWriterPadding    int
+	TableWriterExpandRows bool
 }
 
 type Row []string
@@ -224,22 +225,53 @@ var tableWriterReplacer = strings.NewReplacer(
 	"\r", " ",
 )
 
+// expandRow expands a row with cells containing line breaks into multiple rows.
+// Example: ["A", "X\nY", "1"] becomes [["A", "X", "1"], ["", "Y", ""]].
+func expandRow(row Row) [][]string {
+	cols := len(row)
+	lines := make([][]string, cols)
+	maxLines := 0
+
+	for i, cell := range row {
+		lines[i] = strings.Split(strings.TrimSpace(cell), "\n")
+		if len(lines[i]) > maxLines {
+			maxLines = len(lines[i])
+		}
+	}
+
+	result := make([][]string, maxLines)
+	for i := range maxLines {
+		result[i] = make([]string, cols)
+		for j, col := range lines {
+			if i < len(col) {
+				result[i][j] = col[i]
+			}
+		}
+	}
+	return result
+}
+
 func (t *Table) renderUsingTabWriterLike() string {
 	padding := strings.Repeat(" ", t.TableWriterPadding)
 
 	// Process rows and calculate column widths
-	processedRows := make([][]string, len(t.rows))
-	for i, row := range t.rows {
-		processedRows[i] = make([]string, len(row))
-		for j, col := range row {
-			if idx := strings.IndexAny(col, "\f\n\r"); idx >= 0 {
-				if TableConfig.TabWriterTruncate || t.TableWriterTruncate {
-					col = col[:idx] + " ..."
-				} else {
-					col = tableWriterReplacer.Replace(col)
+	var processedRows [][]string
+	for _, row := range t.rows {
+		if t.TableWriterExpandRows {
+			processedRows = append(processedRows, expandRow(row)...)
+		} else {
+			newRow := make([]string, len(row))
+			for j, col := range row {
+				if idx := strings.IndexAny(col, "\f\n\r"); idx >= 0 {
+					if TableConfig.TabWriterTruncate || t.TableWriterTruncate {
+						col = col[:idx] + " ..."
+					} else {
+						col = tableWriterReplacer.Replace(col)
+					}
 				}
+				newRow[j] = col
 			}
-			processedRows[i][j] = col
+			processedRows = append(processedRows, newRow)
 		}
 	}
 

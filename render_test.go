@@ -635,6 +635,379 @@ func TestStringTabWriterWithANSIColors(t *testing.T) {
 	assert.Equal(t, 0, runeLen(lines[4]))  // Trailing newline
 }
 
+// Tests for expandRow function and TableWriterExpandRows flag
+
+func TestExpandRowSimple(t *testing.T) {
+	result := expandRow(Row{"A", "X\nY", "1"})
+	expected := [][]string{
+		{"A", "X", "1"},
+		{"", "Y", ""},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowNoNewlines(t *testing.T) {
+	result := expandRow(Row{"A", "B", "C"})
+	expected := [][]string{
+		{"A", "B", "C"},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowEmptyRow(t *testing.T) {
+	result := expandRow(Row{})
+	assert.Len(t, result, 0)
+}
+
+func TestExpandRowSingleCell(t *testing.T) {
+	result := expandRow(Row{"A\nB\nC"})
+	expected := [][]string{
+		{"A"},
+		{"B"},
+		{"C"},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowEmptyCells(t *testing.T) {
+	result := expandRow(Row{"", "X\nY", ""})
+	expected := [][]string{
+		{"", "X", ""},
+		{"", "Y", ""},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowAllEmpty(t *testing.T) {
+	result := expandRow(Row{"", "", ""})
+	expected := [][]string{
+		{"", "", ""},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowWhitespaceOnly(t *testing.T) {
+	result := expandRow(Row{"  ", "X\nY", "   "})
+	expected := [][]string{
+		{"", "X", ""},
+		{"", "Y", ""},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowMultipleNewlines(t *testing.T) {
+	result := expandRow(Row{"A", "1\n2\n3\n4\n5", "X"})
+	expected := [][]string{
+		{"A", "1", "X"},
+		{"", "2", ""},
+		{"", "3", ""},
+		{"", "4", ""},
+		{"", "5", ""},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowDifferentLineCounts(t *testing.T) {
+	result := expandRow(Row{"A\nB", "1\n2\n3", "X"})
+	expected := [][]string{
+		{"A", "1", "X"},
+		{"B", "2", ""},
+		{"", "3", ""},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowLeadingTrailingNewlines(t *testing.T) {
+	// TrimSpace removes leading/trailing whitespace including newlines
+	result := expandRow(Row{"\nA\n", "X", "1"})
+	expected := [][]string{
+		{"A", "X", "1"},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowUnicode(t *testing.T) {
+	result := expandRow(Row{"日本語", "こんにちは\nさようなら", "🎉"})
+	expected := [][]string{
+		{"日本語", "こんにちは", "🎉"},
+		{"", "さようなら", ""},
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExpandRowWithColors(t *testing.T) {
+	colored := withColor("red") + "\n" + withColor("blue")
+	result := expandRow(Row{"A", colored, "1"})
+	assert.Len(t, result, 2)
+	assert.Equal(t, "A", result[0][0])
+	assert.Contains(t, result[0][1], "red")
+	assert.Equal(t, "1", result[0][2])
+	assert.Equal(t, "", result[1][0])
+	assert.Contains(t, result[1][1], "blue")
+	assert.Equal(t, "", result[1][2])
+}
+
+func TestTableWriterExpandRowsBasic(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.Headers = Row{"Name", "Values", "Status"}
+	table.AddRow(Row{"Item1", "A\nB\nC", "OK"})
+	table.AddRow(Row{"Item2", "X", "Done"})
+	output := table.String()
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 6) // header + 4 data lines + trailing newline
+	assert.Contains(t, lines[0], "NAME")
+	assert.Contains(t, lines[1], "Item1")
+	assert.Contains(t, lines[1], "A")
+	assert.Contains(t, lines[1], "OK")
+	assert.Contains(t, lines[2], "B")
+	assert.Contains(t, lines[3], "C")
+	assert.Contains(t, lines[4], "Item2")
+}
+
+func TestTableWriterExpandRowsNoHeaders(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.AddRow(Row{"A", "1\n2", "X"})
+	table.AddRow(Row{"B", "3", "Y"})
+	output := table.String()
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 4) // 3 data lines + trailing newline
+	assert.Contains(t, lines[0], "A")
+	assert.Contains(t, lines[0], "1")
+	assert.Contains(t, lines[0], "X")
+	assert.Contains(t, lines[1], "2")
+	assert.Contains(t, lines[2], "B")
+	assert.Contains(t, lines[2], "3")
+	assert.Contains(t, lines[2], "Y")
+}
+
+func TestTableWriterExpandRowsWithPadding(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.TableWriterPadding = 4
+	table.Headers = Row{"Col1", "Col2"}
+	table.AddRow(Row{"A", "X\nY"})
+	expected := `    COL1   COL2
+    A      X
+           Y
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestTableWriterExpandRowsDisabled(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	TableConfig.TabWriterTruncate = false
+	defer func() {
+		TableConfig.UseTabWriter = false
+		TableConfig.TabWriterTruncate = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = false
+	table.AddRow(Row{"A", "X\nY", "1"})
+	// When disabled, newlines should be replaced with spaces (default behavior)
+	output := table.String()
+	assert.Contains(t, output, "X Y")
+	assert.NotContains(t, output, "X\nY")
+}
+
+func TestTableWriterExpandRowsVsTruncate(t *testing.T) {
+	// ExpandRows should take precedence - when enabled, truncate is ignored for newlines
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.TableWriterTruncate = true // This should be ignored when ExpandRows is true
+	table.AddRow(Row{"A", "X\nY\nZ", "1"})
+	output := table.String()
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 4) // 3 rows + trailing newline
+}
+
+func TestTableWriterExpandRowsAllCellsMultiline(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.AddRow(Row{"A\nB", "1\n2", "X\nY"})
+	expected := `A   1   X
+B   2   Y
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestTableWriterExpandRowsUnevenMultiline(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.AddRow(Row{"A", "1\n2\n3\n4", "X\nY"})
+	output := table.String()
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 5) // 4 data lines + trailing newline
+	assert.Contains(t, lines[0], "A")
+	assert.Contains(t, lines[0], "1")
+	assert.Contains(t, lines[0], "X")
+	assert.Contains(t, lines[1], "2")
+	assert.Contains(t, lines[1], "Y")
+	assert.Contains(t, lines[2], "3")
+	assert.Contains(t, lines[3], "4")
+}
+
+func TestTableWriterExpandRowsUnicode(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.Headers = Row{"名前", "値"}
+	table.AddRow(Row{"テスト", "あ\nい\nう"})
+	output := table.String()
+	assert.Contains(t, output, "テスト")
+	assert.Contains(t, output, "あ")
+	assert.Contains(t, output, "い")
+	assert.Contains(t, output, "う")
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 5) // header + 3 data lines + trailing newline
+}
+
+func TestTableWriterExpandRowsWithColors(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	colored := withColor("line1") + "\n" + withColor("line2")
+	table.AddRow(Row{"A", colored, "X"})
+	output := table.String()
+	assert.Contains(t, output, "\033[0;31;10m")
+	assert.Contains(t, output, "line1")
+	assert.Contains(t, output, "line2")
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 3) // 2 rows + trailing newline
+}
+
+func TestTableWriterExpandRowsEmptyTable(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.Headers = Row{"A", "B"}
+	expected := `A   B
+`
+	assert.Equal(t, expected, table.String())
+}
+
+func TestTableWriterExpandRowsMixedRows(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	table.Headers = Row{"ID", "Items", "Count"}
+	table.AddRow(Row{"1", "apple", "1"})
+	table.AddRow(Row{"2", "banana\norange\ngrape", "3"})
+	table.AddRow(Row{"3", "melon", "1"})
+	output := table.String()
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 7) // header + 5 data lines + trailing newline
+	assert.Contains(t, lines[0], "ID")
+	assert.Contains(t, lines[0], "ITEMS")
+	assert.Contains(t, lines[1], "1")
+	assert.Contains(t, lines[1], "apple")
+	assert.Contains(t, lines[2], "2")
+	assert.Contains(t, lines[2], "banana")
+	assert.Contains(t, lines[2], "3")
+	assert.Contains(t, lines[3], "orange")
+	assert.Contains(t, lines[4], "grape")
+	assert.Contains(t, lines[5], "3")
+	assert.Contains(t, lines[5], "melon")
+}
+
+func TestTableWriterExpandRowsOnlyNewlines(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	// Cell with only newlines should result in empty strings after TrimSpace
+	table.AddRow(Row{"A", "\n\n\n", "X"})
+	output := table.String()
+	// After TrimSpace, "\n\n\n" becomes "" which splits to [""]
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 2) // 1 row + trailing newline
+}
+
+func TestTableWriterExpandRowsCarriageReturn(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	// Only \n triggers expansion, \r should remain in the cell
+	table.AddRow(Row{"A", "X\rY", "1"})
+	output := table.String()
+	// \r is not a split character in expandRow, but TrimSpace might affect it
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 2) // 1 row + trailing newline
+}
+
+func TestTableWriterExpandRowsFormFeed(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	// Only \n triggers expansion, \f should remain in the cell
+	table.AddRow(Row{"A", "X\fY", "1"})
+	output := table.String()
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 2) // 1 row + trailing newline
+}
+
+func TestTableWriterExpandRowsLongContent(t *testing.T) {
+	TableConfig.UseTabWriter = true
+	defer func() {
+		TableConfig.UseTabWriter = false
+	}()
+	table := NewTable()
+	table.TableWriterExpandRows = true
+	longLine1 := strings.Repeat("a", 50)
+	longLine2 := strings.Repeat("b", 50)
+	table.AddRow(Row{"ID", longLine1 + "\n" + longLine2, "OK"})
+	output := table.String()
+	assert.Contains(t, output, longLine1)
+	assert.Contains(t, output, longLine2)
+	lines := strings.Split(output, "\n")
+	assert.Len(t, lines, 3) // 2 rows + trailing newline
+}
+
 func BenchmarkString(b *testing.B) {
 	b.StopTimer()
 	table := NewTable()
