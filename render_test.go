@@ -383,6 +383,182 @@ func TestColoredString(t *testing.T) {
 	assert.Equal(t, expected, table.String())
 }
 
+// TestRuneLenWithFatihColorFormats tests that runeLen correctly handles
+// all ANSI escape sequences produced by github.com/fatih/color library.
+// This prevents regression when handling colored output.
+func TestRuneLenWithFatihColorFormats(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+	}{
+		// Basic colors (single number): \x1b[31m (red), \x1b[32m (green), etc.
+		{
+			name:     "fatih/color basic red",
+			input:    "\x1b[31mhello\x1b[0m",
+			expected: 5,
+		},
+		{
+			name:     "fatih/color basic green",
+			input:    "\x1b[32mworld\x1b[0m",
+			expected: 5,
+		},
+		// Bold attribute (single number): \x1b[1m
+		{
+			name:     "fatih/color bold",
+			input:    "\x1b[1mbold text\x1b[0m",
+			expected: 9,
+		},
+		// Hi-intensity colors: \x1b[90m to \x1b[97m
+		{
+			name:     "fatih/color hi-intensity",
+			input:    "\x1b[91mhi-red\x1b[0m",
+			expected: 6,
+		},
+		// Combined attributes (two numbers): \x1b[1;31m (bold red)
+		{
+			name:     "fatih/color bold+red",
+			input:    "\x1b[1;31mbold red\x1b[0m",
+			expected: 8,
+		},
+		// Background colors: \x1b[41m (red bg)
+		{
+			name:     "fatih/color background",
+			input:    "\x1b[41mred bg\x1b[0m",
+			expected: 6,
+		},
+		// Foreground + Background: \x1b[31;47m
+		{
+			name:     "fatih/color fg+bg",
+			input:    "\x1b[31;47mred on white\x1b[0m",
+			expected: 12,
+		},
+		// 256-color mode: \x1b[38;5;196m (foreground) or \x1b[48;5;196m (background)
+		{
+			name:     "fatih/color 256-color foreground",
+			input:    "\x1b[38;5;196m256 color\x1b[0m",
+			expected: 9,
+		},
+		{
+			name:     "fatih/color 256-color background",
+			input:    "\x1b[48;5;21mblue bg\x1b[0m",
+			expected: 7,
+		},
+		// 24-bit RGB: \x1b[38;2;255;128;0m (foreground orange)
+		{
+			name:     "fatih/color RGB foreground",
+			input:    "\x1b[38;2;255;128;0morange\x1b[0m",
+			expected: 6,
+		},
+		{
+			name:     "fatih/color RGB background",
+			input:    "\x1b[48;2;0;0;255mblue bg\x1b[0m",
+			expected: 7,
+		},
+		// Mixed RGB foreground + background
+		{
+			name:     "fatih/color RGB fg+bg",
+			input:    "\x1b[38;2;255;255;255m\x1b[48;2;0;0;0mwhite on black\x1b[0m",
+			expected: 14,
+		},
+		// Underline and other attributes: \x1b[4m
+		{
+			name:     "fatih/color underline",
+			input:    "\x1b[4munderlined\x1b[0m",
+			expected: 10,
+		},
+		// Nested/chained attributes
+		{
+			name:     "fatih/color nested styles",
+			input:    "\x1b[1m\x1b[4m\x1b[31mbold underline red\x1b[0m",
+			expected: 18,
+		},
+		// Specific reset codes: \x1b[22m (reset bold), \x1b[24m (reset underline)
+		{
+			name:     "fatih/color specific resets",
+			input:    "\x1b[1mbold\x1b[22m normal\x1b[0m",
+			expected: 11,
+		},
+		// Multiple resets in sequence
+		{
+			name:     "fatih/color multiple resets",
+			input:    "\x1b[1m\x1b[4mtext\x1b[22m\x1b[24m\x1b[0m",
+			expected: 4,
+		},
+		// Empty string with just escape codes
+		{
+			name:     "fatih/color only escapes",
+			input:    "\x1b[31m\x1b[0m",
+			expected: 0,
+		},
+		// Real-world example: colored status output
+		{
+			name:     "fatih/color real status",
+			input:    "\x1b[32m✓\x1b[0m \x1b[1mSuccess\x1b[0m",
+			expected: 9, // "✓ Success" = 1 + 1 + 7
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := runeLen(tt.input)
+			assert.Equal(t, tt.expected, got, "runeLen(%q) = %d, want %d", tt.input, got, tt.expected)
+		})
+	}
+}
+
+// TestTableColumnWidthWithFatihColor ensures table column width calculation
+// works correctly with various fatih/color escape sequences.
+func TestTableColumnWidthWithFatihColor(t *testing.T) {
+	tests := []struct {
+		name          string
+		rows          []Row
+		expectedSizes []int
+	}{
+		{
+			name: "basic colors",
+			rows: []Row{
+				{"\x1b[31mred\x1b[0m", "normal"},
+				{"plain", "\x1b[32mgreen\x1b[0m"},
+			},
+			expectedSizes: []int{5, 6},
+		},
+		{
+			name: "256 colors",
+			rows: []Row{
+				{"\x1b[38;5;196mcolor256\x1b[0m", "test"},
+			},
+			expectedSizes: []int{8, 4},
+		},
+		{
+			name: "RGB colors",
+			rows: []Row{
+				{"\x1b[38;2;255;128;0mRGB orange\x1b[0m", "data"},
+			},
+			expectedSizes: []int{10, 4},
+		},
+		{
+			name: "mixed styles",
+			rows: []Row{
+				{"\x1b[1;31mbold red\x1b[0m", "\x1b[4munderline\x1b[0m"},
+				{"\x1b[38;2;0;255;0mRGB green\x1b[0m", "plain"},
+			},
+			expectedSizes: []int{9, 9},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			table := NewTable()
+			for _, row := range tt.rows {
+				table.AddRow(row)
+			}
+			sizes := table.columnsSize()
+			assert.Equal(t, tt.expectedSizes, sizes)
+		})
+	}
+}
+
 func TestResizeLargestColumnOnWhitespace(t *testing.T) {
 	tb := NewTable()
 	tb.AddRow(Row{"1", "abc def ghi jk"})

@@ -33,12 +33,17 @@ var TableConfig = struct {
 	TabWriterTruncate: false,
 }
 
+// ignoredPatterns matches ANSI escape sequences produced by fatih/color and similar libraries.
+// Covers: single codes (\033[31m), multiple codes (\033[1;31m), 256-color (\033[38;5;196m),
+// 24-bit RGB (\033[38;2;255;128;0m), and reset sequences (\033[0m, \033[22m, etc.)
 var ignoredPatterns = []*regexp.Regexp{
-	regexp.MustCompile("\033\\[\\d+;\\d+;\\d+m"),
+	// matches any SGR sequence with at least one non-zero digit (colors, bold, etc., but not pure \033[0m)
+	regexp.MustCompile("\033\\[[0-9;]*[1-9][0-9;]*m"),
+	// matches reset sequence specifically
 	regexp.MustCompile("\033\\[0m"),
 }
 
-var ignoredPattern = regexp.MustCompile("\033\\[\\d+;\\d+;\\d+m|\033\\[0m")
+var ignoredPattern = regexp.MustCompile("\033\\[\\d+(;\\d+)*m")
 
 type Table struct {
 	Headers       Row
