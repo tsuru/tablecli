@@ -75,7 +75,7 @@ func TestSeparator(t *testing.T) {
 	table := NewTable()
 	expected := "+-------+---+\n"
 	buf := &strings.Builder{}
-	table.separator(buf, []int{5, 1})
+	table.separator(buf, []int{5, 1}, sepTop)
 	assert.Equal(t, expected, buf.String())
 }
 
@@ -1182,6 +1182,110 @@ func TestTableWriterExpandRowsLongContent(t *testing.T) {
 	assert.Contains(t, output, longLine2)
 	lines := strings.Split(output, "\n")
 	assert.Len(t, lines, 3) // 2 rows + trailing newline
+}
+
+func TestUTF8BordersBasic(t *testing.T) {
+	TableConfig.UseUTF8Borders = true
+	defer func() { TableConfig.UseUTF8Borders = false }()
+	table := NewTable()
+	table.AddRow(Row{"One", "1"})
+	table.AddRow(Row{"Two", "2"})
+	table.AddRow(Row{"Three", "3"})
+	expected := "┌───────┬───┐\n│ One   │ 1 │\n│ Two   │ 2 │\n│ Three │ 3 │\n└───────┴───┘\n"
+	assert.Equal(t, expected, table.String())
+}
+
+func TestUTF8BordersWithHeaders(t *testing.T) {
+	TableConfig.UseUTF8Borders = true
+	defer func() { TableConfig.UseUTF8Borders = false }()
+	table := NewTable()
+	table.Headers = Row{"Word", "Number"}
+	table.AddRow(Row{"One", "1"})
+	table.AddRow(Row{"Two", "2"})
+	table.AddRow(Row{"Three", "3"})
+	expected := "┌───────┬────────┐\n│ Word  │ Number │\n├───────┼────────┤\n│ One   │ 1      │\n│ Two   │ 2      │\n│ Three │ 3      │\n└───────┴────────┘\n"
+	assert.Equal(t, expected, table.String())
+}
+
+func TestUTF8BordersWithLineSeparator(t *testing.T) {
+	TableConfig.UseUTF8Borders = true
+	defer func() { TableConfig.UseUTF8Borders = false }()
+	table := NewTable()
+	table.LineSeparator = true
+	table.AddRow(Row{"One", "1"})
+	table.AddRow(Row{"Two", "2"})
+	table.AddRow(Row{"Three", "3"})
+	expected := "┌───────┬───┐\n│ One   │ 1 │\n├───────┼───┤\n│ Two   │ 2 │\n├───────┼───┤\n│ Three │ 3 │\n└───────┴───┘\n"
+	assert.Equal(t, expected, table.String())
+}
+
+func TestUTF8BordersWithHeadersAndLineSeparator(t *testing.T) {
+	TableConfig.UseUTF8Borders = true
+	defer func() { TableConfig.UseUTF8Borders = false }()
+	table := NewTable()
+	table.Headers = Row{"Word", "Number"}
+	table.LineSeparator = true
+	table.AddRow(Row{"One", "1"})
+	table.AddRow(Row{"Two", "2"})
+	expected := "┌──────┬────────┐\n│ Word │ Number │\n├──────┼────────┤\n│ One  │ 1      │\n├──────┼────────┤\n│ Two  │ 2      │\n└──────┴────────┘\n"
+	assert.Equal(t, expected, table.String())
+}
+
+func TestBorderColorFuncASCII(t *testing.T) {
+	TableConfig.BorderColorFunc = func(s string) string {
+		return "[" + s + "]"
+	}
+	defer func() { TableConfig.BorderColorFunc = nil }()
+	table := NewTable()
+	table.AddRow(Row{"One", "1"})
+	result := table.String()
+	assert.Contains(t, result, "[+]")
+	assert.Contains(t, result, "[|]")
+	assert.Contains(t, result, "[-----]")
+}
+
+func TestBorderColorFuncUTF8(t *testing.T) {
+	TableConfig.UseUTF8Borders = true
+	TableConfig.BorderColorFunc = func(s string) string {
+		return "[" + s + "]"
+	}
+	defer func() {
+		TableConfig.UseUTF8Borders = false
+		TableConfig.BorderColorFunc = nil
+	}()
+	table := NewTable()
+	table.AddRow(Row{"One", "1"})
+	result := table.String()
+	assert.Contains(t, result, "[┌]")
+	assert.Contains(t, result, "[┐]")
+	assert.Contains(t, result, "[└]")
+	assert.Contains(t, result, "[┘]")
+	assert.Contains(t, result, "[│]")
+	assert.Contains(t, result, "[─────]")
+}
+
+func TestUTF8BordersSeparatorPositions(t *testing.T) {
+	TableConfig.UseUTF8Borders = true
+	defer func() { TableConfig.UseUTF8Borders = false }()
+	table := NewTable()
+	buf := &strings.Builder{}
+	table.separator(buf, []int{3, 2}, sepTop)
+	assert.Equal(t, "┌─────┬────┐\n", buf.String())
+	buf.Reset()
+	table.separator(buf, []int{3, 2}, sepMiddle)
+	assert.Equal(t, "├─────┼────┤\n", buf.String())
+	buf.Reset()
+	table.separator(buf, []int{3, 2}, sepBottom)
+	assert.Equal(t, "└─────┴────┘\n", buf.String())
+}
+
+func TestUTF8BordersNoRows(t *testing.T) {
+	TableConfig.UseUTF8Borders = true
+	defer func() { TableConfig.UseUTF8Borders = false }()
+	table := NewTable()
+	table.Headers = Row{"Word", "Number"}
+	expected := "┌──────┬────────┐\n│ Word │ Number │\n├──────┼────────┤\n└──────┴────────┘\n"
+	assert.Equal(t, expected, table.String())
 }
 
 func BenchmarkString(b *testing.B) {

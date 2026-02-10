@@ -24,6 +24,9 @@ var TableConfig = struct {
 	MaxTTYWidth  int
 
 	TabWriterTruncate bool
+
+	UseUTF8Borders  bool
+	BorderColorFunc func(string) string
 }{
 	BreakOnAny:   false,
 	ForceWrap:    false,
@@ -31,6 +34,24 @@ var TableConfig = struct {
 	MaxTTYWidth:  0,
 
 	TabWriterTruncate: false,
+
+	UseUTF8Borders:  false,
+	BorderColorFunc: nil,
+}
+
+type separatorPosition int
+
+const (
+	sepTop separatorPosition = iota
+	sepMiddle
+	sepBottom
+)
+
+func borderColor(s string) string {
+	if TableConfig.BorderColorFunc != nil {
+		return TableConfig.BorderColorFunc(s)
+	}
+	return s
 }
 
 // ignoredPatterns matches ANSI escape sequences produced by fatih/color and similar libraries.
@@ -75,7 +96,11 @@ func (t *Table) SortByColumn(columns ...int) {
 }
 
 func (t *Table) addRows(rows rowSlice, sizes []int, buf *strings.Builder) {
-	for _, row := range rows {
+	vbar := borderColor("|")
+	if TableConfig.UseUTF8Borders {
+		vbar = borderColor("│")
+	}
+	for rowIdx, row := range rows {
 		extraRows := rowSlice{}
 		for column, field := range row {
 			parts := strings.Split(field, "\n")
@@ -90,16 +115,22 @@ func (t *Table) addRows(rows rowSlice, sizes []int, buf *strings.Builder) {
 				}
 				newRow[column] = parts[i+1]
 			}
-			buf.WriteString("| ")
+			buf.WriteString(vbar)
+			buf.WriteString(" ")
 			buf.WriteString(field)
 			buf.Write(bytes.Repeat([]byte(" "), sizes[column]+1-runeLen(field)))
 		}
-		buf.WriteString("|\n")
+		buf.WriteString(vbar)
+		buf.WriteString("\n")
 		t.addRows(extraRows, sizes, buf)
 		ptr1 := reflect.ValueOf(rows).Pointer()
 		ptr2 := reflect.ValueOf(t.rows).Pointer()
 		if ptr1 == ptr2 && t.LineSeparator {
-			t.separator(buf, sizes)
+			if rowIdx == len(rows)-1 {
+				t.separator(buf, sizes, sepBottom)
+			} else {
+				t.separator(buf, sizes, sepMiddle)
+			}
 		}
 	}
 }
@@ -354,19 +385,25 @@ func (t *Table) String() string {
 	}
 	sizes := t.resizeLargestColumn(ttyWidth)
 	buf := &strings.Builder{}
-	t.separator(buf, sizes)
+	t.separator(buf, sizes, sepTop)
 	if t.Headers != nil {
+		vbar := borderColor("|")
+		if TableConfig.UseUTF8Borders {
+			vbar = borderColor("│")
+		}
 		for column, header := range t.Headers {
-			buf.WriteString("| ")
+			buf.WriteString(vbar)
+			buf.WriteString(" ")
 			buf.WriteString(header)
 			buf.Write(bytes.Repeat([]byte(" "), sizes[column]+1-len(header)))
 		}
-		buf.WriteString("|\n")
-		t.separator(buf, sizes)
+		buf.WriteString(vbar)
+		buf.WriteString("\n")
+		t.separator(buf, sizes, sepMiddle)
 	}
 	t.addRows(t.rows, sizes, buf)
 	if !t.LineSeparator {
-		t.separator(buf, sizes)
+		t.separator(buf, sizes, sepBottom)
 	}
 	return buf.String()
 }
@@ -430,12 +467,30 @@ func (t *Table) columnsSize() []int {
 	return sizes
 }
 
-func (t *Table) separator(buf *strings.Builder, sizes []int) {
-	for _, sz := range sizes {
-		buf.WriteString("+")
-		buf.Write(bytes.Repeat([]byte("-"), sz+2))
+func (t *Table) separator(buf *strings.Builder, sizes []int, pos separatorPosition) {
+	left, mid, right, horiz := "+", "+", "+", "-"
+	if TableConfig.UseUTF8Borders {
+		switch pos {
+		case sepTop:
+			left, mid, right, horiz = "┌", "┬", "┐", "─"
+		case sepMiddle:
+			left, mid, right, horiz = "├", "┼", "┤", "─"
+		case sepBottom:
+			left, mid, right, horiz = "└", "┴", "┘", "─"
+		}
 	}
-	buf.WriteString("+\n")
+	colorLeft := borderColor(left)
+	colorMid := borderColor(mid)
+	colorRight := borderColor(right)
+	buf.WriteString(colorLeft)
+	for i, sz := range sizes {
+		if i > 0 {
+			buf.WriteString(colorMid)
+		}
+		buf.WriteString(borderColor(strings.Repeat(horiz, sz+2)))
+	}
+	buf.WriteString(colorRight)
+	buf.WriteString("\n")
 }
 
 type rowSlice []Row
